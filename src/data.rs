@@ -2,13 +2,15 @@
 pub enum Token {
     PlusEqual,
     MinusEqual,
+    StarEqual,
+    DivideEqual,
     EqualEqual,
     Plus,
     Minus,
     Star,
     Divide,
-    I64(i64),
     Equal,
+    I64(i64),
 }
 
 // holds where a piece of code came from

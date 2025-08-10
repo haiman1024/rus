@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_all_operators() {
-        let input = "+-*/+=-====";
+        let input = "+-*/+=-=*=/====";
         let reader = BufReader::new(Cursor::new(input));
         let mut lexer = lex::Lexer::new("test.rs", reader);
 
@@ -87,10 +87,16 @@ mod tests {
         assert!(matches!(token6, Ok(data::Token::MinusEqual)));
 
         let token7 = lexer.next().unwrap().data;
-        assert!(matches!(token7, Ok(data::Token::EqualEqual)));
+        assert!(matches!(token7, Ok(data::Token::StarEqual)));
 
         let token8 = lexer.next().unwrap().data;
-        assert!(matches!(token8, Ok(data::Token::Equal)));
+        assert!(matches!(token8, Ok(data::Token::DivideEqual)));
+
+        let token9 = lexer.next().unwrap().data;
+        assert!(matches!(token9, Ok(data::Token::EqualEqual)));
+
+        let token10 = lexer.next().unwrap().data;
+        assert!(matches!(token10, Ok(data::Token::Equal)));
 
         assert!(lexer.next().is_none());
     }

@@ -56,6 +56,15 @@ impl<'a, R: Read> Lexer<'a, R> {
         self.current = self.next_char();
         self.current
     }
+    fn skip_whitespace(&mut self) {
+        while let Some(c) = self.peek() {
+            if c.is_ascii_whitespace() {
+                self.next_char();
+            } else {
+                break;
+            }
+        }
+    }
     fn parse_i64(&mut self) -> Result<Token, String> {
         let mut current: i64 = 0;
         let mut digits = std::iter::from_fn(|| match self.peek() {
@@ -80,6 +89,51 @@ impl<'a, R: Read> Lexer<'a, R> {
 
         Ok(Token::I64(current))
     }
+    fn parse_plus_family(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::PlusEqual)
+            }
+            _ => Ok(Token::Plus),
+        }
+    }
+    fn parse_minus_family(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::MinusEqual)
+            }
+            _ => Ok(Token::Minus),
+        }
+    }
+    fn parse_equal_family(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::EqualEqual)
+            }
+            _ => Ok(Token::Equal),
+        }
+    }
+    fn parse_star_family(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::StarEqual)
+            }
+            _ => Ok(Token::Star),
+        }
+    }
+    fn parse_divide_family(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::DivideEqual)
+            }
+            _ => Ok(Token::Divide),
+        }
+    }
 }
 
 impl<'a, R: Read> Iterator for Lexer<'a, R> {
@@ -88,45 +142,26 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
     type Item = Locatable<'a, Result<Token, String>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_char().and_then(|c| {
+        loop {
+            self.skip_whitespace();
+
+            let c = self.next_char()?;
             let location = self.location.clone();
+
             let data = match c {
-                '+' => Ok(match self.peek() {
-                    Some('=') => {
-                        self.next_char();
-                        Token::PlusEqual
-                    }
-                    _ => Token::Plus,
-                }),
-                '-' => Ok(match self.peek() {
-                    Some('=') => {
-                        self.next_char();
-                        Token::MinusEqual
-                    }
-                    _ => Token::Minus,
-                }),
-                '*' => Ok(Token::Star),
-                '/' => Ok(Token::Divide),
-                '=' => Ok(match self.peek() {
-                    Some('=') => {
-                        self.next_char();
-                        Token::EqualEqual
-                    }
-                    _ => Token::Equal,
-                }),
+                '+' => self.parse_plus_family(),
+                '-' => self.parse_minus_family(),
+                '=' => self.parse_equal_family(),
+                '*' => self.parse_star_family(),
+                '/' => self.parse_divide_family(),
                 '0'..='9' => {
                     self.unput(Some(c));
                     self.parse_i64()
                 }
-                '\r' | '\n' | ' ' | '\t' => {
-                    return self.next();
-                }
                 _ => Err(String::from("unknown character")),
             };
-            Some(Self::Item {
-                location: location,
-                data: data,
-            })
-        })
+
+            return Some(Self::Item { location, data });
+        }
     }
 }
