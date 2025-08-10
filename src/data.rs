@@ -1,5 +1,5 @@
 #[derive(Debug)]
-pub enum TokenType {
+pub enum Token {
     Plus,
     Minus,
     Star,
@@ -21,6 +21,3 @@ pub struct Locatable<'a, T> {
     pub location: Location<'a>,
     pub data: T,
 }
-
-pub type Token<'a> = Locatable<'a, TokenType>;
-pub type Error<'a> = Locatable<'a, String>;
