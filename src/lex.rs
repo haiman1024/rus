@@ -91,10 +91,29 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
         self.next_char().and_then(|c| {
             let location = self.location.clone();
             let data = match c {
-                '+' => Ok(Token::Plus),
-                '-' => Ok(Token::Minus),
+                '+' => Ok(match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::PlusEqual
+                    }
+                    _ => Token::Plus,
+                }),
+                '-' => Ok(match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::MinusEqual
+                    }
+                    _ => Token::Minus,
+                }),
                 '*' => Ok(Token::Star),
                 '/' => Ok(Token::Divide),
+                '=' => Ok(match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Token::EqualEqual
+                    }
+                    _ => Token::Equal,
+                }),
                 '0'..='9' => {
                     self.unput(Some(c));
                     self.parse_i64()

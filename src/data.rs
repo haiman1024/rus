@@ -1,10 +1,14 @@
 #[derive(Debug)]
 pub enum Token {
+    PlusEqual,
+    MinusEqual,
+    EqualEqual,
     Plus,
     Minus,
     Star,
     Divide,
     I64(i64),
+    Equal,
 }
 
 // holds where a piece of code came from
