@@ -7,12 +7,24 @@ description = "A Rust compiler written in Rust"
 repository = "https://github.com/haiman/rus"
 readme = "README.md"
 license = "Apache License 2.0"
-keywords = ["Rust", "compiler", "LLVM"]
+keywords = ["compiler", "lexer", "parser"]
 default-run = "rus"
 documentation = "https://docs.rs/rus"
-
+categories = ["compilers"]
 
 [dependencies]
+
+[lib]
+name = "rus"
+path = "src/lib.rs"
+
+[[bin]]
+name = "rus"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
 
 
 # [dev-dependencies]
@@ -22,9 +34,6 @@ documentation = "https://docs.rs/rus"
 
 
 # [workspace]
-
-
-# [profile.release]
 
 
 # [profile.test]

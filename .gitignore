@@ -1,2 +1,19 @@
 /target
 /repo
+# Compiled files
+/target
+/**/*.rs.bk
+
+# Dependency lockfiles
+Cargo.lock
+
+# Repository directory
+/repo
+
+# IDE files
+.vscode/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
