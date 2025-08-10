@@ -8,6 +8,7 @@ pub struct Lexer<'a, R: Read> {
     location: Location<'a>,
     reader: BufReader<R>,
     iterator: IntoIter<char>,
+    current: Option<char>,
 }
 
 impl<'a, R: Read> Lexer<'a, R> {
@@ -20,24 +21,46 @@ impl<'a, R: Read> Lexer<'a, R> {
             },
             reader: stream,
             iterator: Vec::new().into_iter(),
+            current: None,
         }
     }
 
     fn next_char(&mut self) -> Option<char> {
-        match self.iterator.next() {
-            Some(c) => Some(c),
-            None => {
-                let mut buf: String = String::new();
-                return match self.reader.read_line(&mut buf) {
-                    Ok(_) => {
-                        self.location.line += 1;
-                        self.location.column = 1;
-                        self.iterator = buf.chars().collect::<Vec<_>>().into_iter();
-                        self.iterator.next()
-                    }
-                    Err(_) => None,
-                };
+        if let Some(c) = self.current {
+            self.current = None;
+            Some(c)
+        } else {
+            match self.iterator.next() {
+                Some(c) => Some(c),
+                None => {
+                    let mut buf: String = String::new();
+                    return match self.reader.read_line(&mut buf) {
+                        Ok(_) => {
+                            self.location.line += 1;
+                            self.location.column = 1;
+                            self.iterator = buf.chars().collect::<Vec<_>>().into_iter();
+                            self.iterator.next()
+                        }
+                        Err(_) => None,
+                    };
+                }
             }
+        }
+    }
+    fn unput(&mut self, c: Option<char>) {
+        self.current = c;
+    }
+    fn peek(&mut self) -> Option<char> {
+        self.current = self.next_char();
+        self.current
+    }
+    fn parse_i64(&mut self, current: i64) -> TokenType {
+        match self.peek() {
+            Some(c) if '0' <= c && c <= '9' => {
+                self.next_char();
+                self.parse_i64(current * 10 + c as i64 - '0' as i64)
+            }
+            _ => TokenType::I64(current),
         }
     }
 }
@@ -50,18 +73,26 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
     fn next(&mut self) -> Option<Self::Item> {
         self.next_char().and_then(|c| {
             let location = self.location.clone();
-            let result = match c {
-                '+' => Ok(Token {
-                    location: location,
-                    data: TokenType::Plus,
-                }),
-                _ => Err(Error {
-                    location,
-                    data: String::from("Unknown token"),
-                }),
-            };
             self.location.column += 1;
-            Some(result)
+            Some(Ok(Token {
+                data: match c {
+                    '+' => TokenType::Plus,
+                    '-' => TokenType::Minus,
+                    '*' => TokenType::Star,
+                    '/' => TokenType::Divide,
+                    '0'..='9' => {
+                        self.unput(Some(c));
+                        self.parse_i64(0)
+                    }
+                    _ => {
+                        return Some(Err(Error {
+                            location: location,
+                            data: format!("Unexpected character: {}", c),
+                        }));
+                    }
+                },
+                location: location,
+            }))
         })
     }
 }

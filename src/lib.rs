@@ -10,12 +10,12 @@
 //! use std::io::BufReader;
 //! use std::io::Cursor;
 //!
-//! let input = "+";
+//! let input = "12 + 34";
 //! let reader = BufReader::new(Cursor::new(input));
 //! let mut lexer = Lexer::new("test.rs", reader);
 //!
-//! let token = lexer.next().unwrap().unwrap();
-//! assert!(matches!(token.data, TokenType::Plus));
+//! let token1 = lexer.next().unwrap().unwrap();
+//! assert!(matches!(token1.data, TokenType::I64(12)));
 //! ```
 
 pub mod data;
@@ -47,8 +47,24 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_plus_tokens() {
-        let input = "++";
+    fn test_multiple_tokens() {
+        let input = "12+34";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let token1 = lexer.next().unwrap().unwrap();
+        assert!(matches!(token1.data, data::TokenType::I64(12)));
+
+        let token2 = lexer.next().unwrap().unwrap();
+        assert!(matches!(token2.data, data::TokenType::Plus));
+
+        let token3 = lexer.next().unwrap().unwrap();
+        assert!(matches!(token3.data, data::TokenType::I64(34)));
+    }
+
+    #[test]
+    fn test_all_operators() {
+        let input = "+-*/";
         let reader = BufReader::new(Cursor::new(input));
         let mut lexer = lex::Lexer::new("test.rs", reader);
 
@@ -56,6 +72,12 @@ mod tests {
         assert!(matches!(token1.data, data::TokenType::Plus));
 
         let token2 = lexer.next().unwrap().unwrap();
-        assert!(matches!(token2.data, data::TokenType::Plus));
+        assert!(matches!(token2.data, data::TokenType::Minus));
+
+        let token3 = lexer.next().unwrap().unwrap();
+        assert!(matches!(token3.data, data::TokenType::Star));
+
+        let token4 = lexer.next().unwrap().unwrap();
+        assert!(matches!(token4.data, data::TokenType::Divide));
     }
 }
