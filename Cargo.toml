@@ -2,5 +2,35 @@
 name = "rus"
 version = "0.1.0"
 edition = "2024"
+authors = ["HaiMan <alexredskaber@gmail.com>"]
+description = "A Rust compiler written in Rust"
+repository = "https://github.com/haiman/rus"
+readme = "README.md"
+license = "Apache License 2.0"
+keywords = ["Rust", "compiler", "LLVM"]
+default-run = "rus"
+documentation = "https://docs.rs/rus"
+
 
 [dependencies]
+
+
+# [dev-dependencies]
+
+
+# [features]
+
+
+# [workspace]
+
+
+# [profile.release]
+
+
+# [profile.test]
+
+
+# [profile.bench]
+
+
+# [package.metadata.docs.rs]
