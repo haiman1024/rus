@@ -142,26 +142,24 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
     type Item = Locatable<'a, Result<Token, String>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            self.skip_whitespace();
+        self.skip_whitespace();
 
-            let c = self.next_char()?;
-            let location = self.location.clone();
+        let c = self.next_char()?;
+        let location = self.location.clone();
 
-            let data = match c {
-                '+' => self.parse_plus_family(),
-                '-' => self.parse_minus_family(),
-                '=' => self.parse_equal_family(),
-                '*' => self.parse_star_family(),
-                '/' => self.parse_divide_family(),
-                '0'..='9' => {
-                    self.unput(Some(c));
-                    self.parse_i64()
-                }
-                _ => Err(String::from("unknown character")),
-            };
+        let data = match c {
+            '+' => self.parse_plus_family(),
+            '-' => self.parse_minus_family(),
+            '=' => self.parse_equal_family(),
+            '*' => self.parse_star_family(),
+            '/' => self.parse_divide_family(),
+            '0'..='9' => {
+                self.unput(Some(c));
+                self.parse_i64()
+            }
+            _ => Err(String::from("unknown character")),
+        };
 
-            return Some(Self::Item { location, data });
-        }
+        return Some(Self::Item { location, data });
     }
 }
