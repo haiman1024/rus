@@ -9,6 +9,7 @@ This is a simple compiler project written in Rust. It demonstrates the basic pri
 ## Features
 
 - Lexical analysis for basic arithmetic expressions
+- Token recognition for plus operator (+)
 - Error reporting with location information
 
 ## Building
