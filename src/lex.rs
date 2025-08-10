@@ -160,6 +160,6 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
             _ => Err(String::from("unknown character")),
         };
 
-        return Some(Self::Item { location, data });
+        Some(Self::Item { location, data })
     }
 }
