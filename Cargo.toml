@@ -13,6 +13,7 @@ documentation = "https://docs.rs/rus"
 categories = ["compilers"]
 
 [dependencies]
+phf = { version = "0.12.1", features = ["macros"] }
 
 [lib]
 name = "rus"

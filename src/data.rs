@@ -13,6 +13,8 @@ pub enum Token {
     I64(i64),
     String(String),
     Char(char),
+    Id(String),
+    Keyword(Keyword),
 }
 
 // holds where a piece of code came from
@@ -28,4 +30,97 @@ pub struct Location<'a> {
 pub struct Locatable<'a, T> {
     pub location: Location<'a>,
     pub data: T,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Keyword {
+    // Strict keywords
+    As,
+    Break,
+    Const,
+    Continue,
+    Crate,
+    Else,
+    Enum,
+    Extern,
+    False,
+    Fn,
+    For,
+    If,
+    Impl,
+    In,
+    Let,
+    Loop,
+    Match,
+    Mod,
+    Move,
+    Mut,
+    Pub,
+    Ref,
+    Return,
+    SelfValue, // self
+    SelfType,  // Self
+    Static,
+    Struct,
+    Super,
+    Trait,
+    True,
+    Type,
+    Unsafe,
+    Use,
+    Where,
+    While,
+
+    // Reserved keywords
+    Abstract,
+    Become,
+    Box,
+    Do,
+    Final,
+    Macro,
+    Override,
+    Priv,
+    Typeof,
+    Unsized,
+    Virtual,
+    Yield,
+
+    // Weak keywords (contextual)
+    Async,
+    Await,
+    Dyn,
+    Union,
+    Try,
+    Underscore, // _
+
+    // Additional type keywords
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    U8,
+    U16,
+    U32,
+    U64,
+    U128,
+    F32,
+    F64,
+    Isize,
+    Usize,
+    Bool,
+    CharType, // Char is already used for character literals, so using CharType
+    Str,      // String type
+    Option,
+    Result,
+    Vec,
+    Slice,
+    Array,
+    Tuple,
+    Unit,       // ()
+    Never,      // !
+    Reference,  // &
+    RawPointer, // *const, *mut
+    FnPointer,  // fn()
+    Closure,    // || {}
 }

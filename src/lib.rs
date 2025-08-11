@@ -149,4 +149,61 @@ mod tests {
             "Multi-character character literal not terminated"
         );
     }
+
+    #[test]
+    fn test_keywords() {
+        let input = "if else while for fn";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let token1 = lexer.next().unwrap().data;
+        assert!(matches!(
+            token1,
+            Ok(data::Token::Keyword(data::Keyword::If))
+        ));
+
+        let token2 = lexer.next().unwrap().data;
+        assert!(matches!(
+            token2,
+            Ok(data::Token::Keyword(data::Keyword::Else))
+        ));
+
+        let token3 = lexer.next().unwrap().data;
+        assert!(matches!(
+            token3,
+            Ok(data::Token::Keyword(data::Keyword::While))
+        ));
+
+        let token4 = lexer.next().unwrap().data;
+        assert!(matches!(
+            token4,
+            Ok(data::Token::Keyword(data::Keyword::For))
+        ));
+
+        let token5 = lexer.next().unwrap().data;
+        assert!(matches!(
+            token5,
+            Ok(data::Token::Keyword(data::Keyword::Fn))
+        ));
+
+        assert!(lexer.next().is_none());
+    }
+
+    #[test]
+    fn test_identifiers() {
+        let input = "my_var myFunc _private";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let token1 = lexer.next().unwrap().data;
+        assert!(matches!(token1, Ok(data::Token::Id(s)) if s == "my_var"));
+
+        let token2 = lexer.next().unwrap().data;
+        assert!(matches!(token2, Ok(data::Token::Id(s)) if s == "myFunc"));
+
+        let token3 = lexer.next().unwrap().data;
+        assert!(matches!(token3, Ok(data::Token::Id(s)) if s == "_private"));
+
+        assert!(lexer.next().is_none());
+    }
 }

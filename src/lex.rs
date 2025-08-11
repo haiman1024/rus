@@ -2,7 +2,91 @@ use std::io::{BufRead, BufReader, Read};
 use std::iter::IntoIterator;
 use std::vec::IntoIter;
 
-use super::data::{Locatable, Location, Token};
+use super::data::{Keyword, Locatable, Location, Token};
+use phf::Map;
+
+static KEYWORDS: Map<&'static str, Keyword> = phf::phf_map! {
+    // Strict keywords
+    "as" => Keyword::As,
+    "break" => Keyword::Break,
+    "const" => Keyword::Const,
+    "continue" => Keyword::Continue,
+    "crate" => Keyword::Crate,
+    "else" => Keyword::Else,
+    "enum" => Keyword::Enum,
+    "extern" => Keyword::Extern,
+    "false" => Keyword::False,
+    "fn" => Keyword::Fn,
+    "for" => Keyword::For,
+    "if" => Keyword::If,
+    "impl" => Keyword::Impl,
+    "in" => Keyword::In,
+    "let" => Keyword::Let,
+    "loop" => Keyword::Loop,
+    "match" => Keyword::Match,
+    "mod" => Keyword::Mod,
+    "move" => Keyword::Move,
+    "mut" => Keyword::Mut,
+    "pub" => Keyword::Pub,
+    "ref" => Keyword::Ref,
+    "return" => Keyword::Return,
+    "self" => Keyword::SelfValue,
+    "Self" => Keyword::SelfType,
+    "static" => Keyword::Static,
+    "struct" => Keyword::Struct,
+    "super" => Keyword::Super,
+    "trait" => Keyword::Trait,
+    "true" => Keyword::True,
+    "type" => Keyword::Type,
+    "unsafe" => Keyword::Unsafe,
+    "use" => Keyword::Use,
+    "where" => Keyword::Where,
+    "while" => Keyword::While,
+
+    // Reserved keywords
+    "abstract" => Keyword::Abstract,
+    "become" => Keyword::Become,
+    "box" => Keyword::Box,
+    "do" => Keyword::Do,
+    "final" => Keyword::Final,
+    "macro" => Keyword::Macro,
+    "override" => Keyword::Override,
+    "priv" => Keyword::Priv,
+    "typeof" => Keyword::Typeof,
+    "unsized" => Keyword::Unsized,
+    "virtual" => Keyword::Virtual,
+    "yield" => Keyword::Yield,
+
+    // Weak keywords (contextual)
+    "async" => Keyword::Async,
+    "await" => Keyword::Await,
+    "dyn" => Keyword::Dyn,
+    "union" => Keyword::Union,
+    "try" => Keyword::Try,
+    "_" => Keyword::Underscore,
+
+    // Additional type keywords
+    "i8" => Keyword::I8,
+    "i16" => Keyword::I16,
+    "i32" => Keyword::I32,
+    "i64" => Keyword::I64,
+    "i128" => Keyword::I128,
+    "u8" => Keyword::U8,
+    "u16" => Keyword::U16,
+    "u32" => Keyword::U32,
+    "u64" => Keyword::U64,
+    "u128" => Keyword::U128,
+    "f32" => Keyword::F32,
+    "f64" => Keyword::F64,
+    "isize" => Keyword::Isize,
+    "usize" => Keyword::Usize,
+    "bool" => Keyword::Bool,
+    "char" => Keyword::CharType,
+    "str" => Keyword::Str,
+    "option" => Keyword::Option,
+    "result" => Keyword::Result,
+    "vec" => Keyword::Vec,
+};
 
 enum CharError {
     Eof,
@@ -226,6 +310,21 @@ impl<'a, R: Read> Lexer<'a, R> {
 
         Ok(Token::String(string))
     }
+    fn parse_id(&mut self, start: char) -> Result<Token, String> {
+        let mut id = String::from(start);
+        while let Some(c) = self.next_char() {
+            if c.is_alphanumeric() || c == '_' {
+                id.push(c);
+            } else {
+                self.unput(Some(c));
+                break;
+            }
+        }
+        match KEYWORDS.get::<str>(&id) {
+            Some(keyword) => Ok(Token::Keyword(*keyword)),
+            None => Ok(Token::Id(id)),
+        }
+    }
 }
 
 impl<'a, R: Read> Iterator for Lexer<'a, R> {
@@ -249,6 +348,7 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
                 self.unput(Some(c));
                 self.parse_i64()
             }
+            'a'..='z' | 'A'..='Z' | '_' => self.parse_id(c),
             '\'' => self.parse_char(),
             '"' => self.parse_string(),
             _ => Err(String::from("unknown character")),
