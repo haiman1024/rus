@@ -11,6 +11,8 @@ pub enum Token {
     Divide,
     Equal,
     I64(i64),
+    String(String),
+    Char(char),
 }
 
 // holds where a piece of code came from

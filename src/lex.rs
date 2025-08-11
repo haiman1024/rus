@@ -4,6 +4,12 @@ use std::vec::IntoIter;
 
 use super::data::{Locatable, Location, Token};
 
+enum CharError {
+    Eof,
+    Newline,
+    Terminator,
+}
+
 pub struct Lexer<'a, R: Read> {
     location: Location<'a>,
     reader: BufReader<R>,
@@ -134,6 +140,92 @@ impl<'a, R: Read> Lexer<'a, R> {
             _ => Ok(Token::Divide),
         }
     }
+    fn parse_single_char(&mut self, string: bool) -> Result<char, CharError> {
+        let terminator = if string { '"' } else { '\'' };
+        loop {
+            if let Some(c) = self.next_char() {
+                if c == '\\' {
+                    if let Some(c) = self.next_char() {
+                        return Ok(match c {
+                            '\n' => continue,
+                            'n' => '\n',
+                            'r' => '\r',
+                            't' => '\t',
+                            '\\' => '\\',
+                            '"' => '"',
+                            '\'' => '\'',
+                            '\0' => '\0',
+                            'b' => '\x08',
+                            'f' => '\x0c',
+                            // TODO: add support for octal and hexadecimal escape sequences
+                            _ => c,
+                        });
+                    } else {
+                        return Err(CharError::Eof);
+                    }
+                } else if c == '\n' {
+                    return Err(CharError::Newline);
+                } else if c == terminator {
+                    return Err(CharError::Terminator);
+                } else {
+                    return Ok(c);
+                }
+            } else {
+                return Err(CharError::Eof);
+            }
+        }
+    }
+
+    fn parse_char(&mut self) -> Result<Token, String> {
+        let c = match self.parse_single_char(false) {
+            Ok(c) => c,
+            Err(CharError::Terminator) => {
+                return Err(String::from("Empty character constant"));
+            }
+            Err(CharError::Newline) => {
+                return Err(String::from("Illegal newline while parsing char literal"));
+            }
+            Err(CharError::Eof) => {
+                return Err(String::from(
+                    "Missing terminating ' character in char literal",
+                ));
+            }
+        };
+
+        match self.next_char() {
+            Some('\'') => Ok(Token::Char(c)),
+            Some('\n') => Err(String::from("Illegal newline while parsing char literal")),
+            Some(_) => {
+                while self.next_char().is_some_and(|next_c| next_c != '\'') {}
+                Err(String::from(
+                    "Multi-character character literal not terminated",
+                ))
+            }
+            None => Err(String::from(
+                "Missing terminating ' character in char literal",
+            )),
+        }
+    }
+    fn parse_string(&mut self) -> Result<Token, String> {
+        let mut string = String::new();
+        static TERM_ERR: &str = "Missing terminating \" character in string";
+        static NEWLINE_ERR: &str = "Illegal newline while parsing string literal";
+
+        loop {
+            match self.parse_single_char(true) {
+                Ok(c) => string.push(c),
+                Err(CharError::Eof) => {
+                    return Err(String::from(TERM_ERR));
+                }
+                Err(CharError::Newline) => {
+                    return Err(String::from(NEWLINE_ERR));
+                }
+                Err(CharError::Terminator) => break,
+            }
+        }
+
+        Ok(Token::String(string))
+    }
 }
 
 impl<'a, R: Read> Iterator for Lexer<'a, R> {
@@ -157,6 +249,8 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
                 self.unput(Some(c));
                 self.parse_i64()
             }
+            '\'' => self.parse_char(),
+            '"' => self.parse_string(),
             _ => Err(String::from("unknown character")),
         };
 

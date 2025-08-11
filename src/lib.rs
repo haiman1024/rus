@@ -114,4 +114,39 @@ mod tests {
             "Overflow while parsing integer literal"
         );
     }
+
+    #[test]
+    fn test_char_literal() {
+        let input = "'a'";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let result = lexer.next().unwrap().data;
+        assert!(matches!(result, Ok(data::Token::Char('a'))));
+    }
+
+    #[test]
+    fn test_empty_char_literal() {
+        let input = "''";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let result = lexer.next().unwrap().data;
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), "Empty character constant");
+    }
+
+    #[test]
+    fn test_multichar_literal() {
+        let input = "'ab'";
+        let reader = BufReader::new(Cursor::new(input));
+        let mut lexer = lex::Lexer::new("test.rs", reader);
+
+        let result = lexer.next().unwrap().data;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "Multi-character character literal not terminated"
+        );
+    }
 }
