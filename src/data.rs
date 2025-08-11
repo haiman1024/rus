@@ -1,18 +1,69 @@
 #[derive(Debug)]
 pub enum Token {
-    PlusEqual,
-    MinusEqual,
-    StarEqual,
-    DivideEqual,
-    EqualEqual,
+    // arithmetic operators
     Plus,
     Minus,
     Star,
     Divide,
-    Equal,
+    Percent, // %
+
+    // bitwise operators
+    BitAnd, // &
+    BitOr,  // |
+    BitXor, // ^
+    Shl,    // <<
+    Shr,    // >>
+    BitNot, // !
+
+    // comparison operators
+    EqualEqual,   // ==
+    NotEqual,     // !=
+    Less,         // <
+    LessEqual,    // <=
+    Greater,      // >
+    GreaterEqual, // >=
+
+    // assignment operators
+    Equal,        // =
+    PlusEqual,    // +=
+    MinusEqual,   // -=
+    StarEqual,    // *=
+    DivideEqual,  // /=
+    PercentEqual, // %=
+    BitAndEqual,  // &=
+    BitOrEqual,   // |=
+    BitXorEqual,  // ^=
+    ShlEqual,     // <<=
+    ShrEqual,     // >>=
+
+    // logical operators
+    And, // &&
+    Or,  // ||
+
+    // other operators
+    Not,        // !
+    Dot,        // .
+    DotDot,     // ..
+    DotDotDot,  // ...
+    DotDotEq,   // ..=
+    Comma,      // ,
+    Semi,       // ;
+    Colon,      // :
+    ColonColon, // ::
+    Arrow,      // ->
+    FatArrow,   // =>
+    At,         // @
+    Underscore, // _
+    Hash,       // #
+    Dollar,     // $
+    Question,   // ?
+
+    // literals
     I64(i64),
     String(String),
     Char(char),
+
+    // identifiers and keywords
     Id(String),
     Keyword(Keyword),
 }

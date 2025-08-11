@@ -10,12 +10,12 @@
 //! use std::io::BufReader;
 //! use std::io::Cursor;
 //!
-//! let input = "12 + 34";
+//! let input = "let x = 12 + 34;";
 //! let reader = BufReader::new(Cursor::new(input));
 //! let mut lexer = Lexer::new("test.rs", reader);
 //!
 //! let result = lexer.next().unwrap().data;
-//! assert!(matches!(result, Ok(Token::I64(12))));
+//! assert!(matches!(result, Ok(Token::Keyword(rus::data::Keyword::Let))));
 //! ```
 
 pub mod data;
@@ -64,7 +64,7 @@ mod tests {
 
     #[test]
     fn test_all_operators() {
-        let input = "+-*/+=-=*=/====";
+        let input = "+ - * / += -= *= /= == = && || != < > <= >= << >>";
         let reader = BufReader::new(Cursor::new(input));
         let mut lexer = lex::Lexer::new("test.rs", reader);
 
@@ -98,9 +98,35 @@ mod tests {
         let token10 = lexer.next().unwrap().data;
         assert!(matches!(token10, Ok(data::Token::Equal)));
 
+        let token11 = lexer.next().unwrap().data;
+        assert!(matches!(token11, Ok(data::Token::And)));
+
+        let token12 = lexer.next().unwrap().data;
+        assert!(matches!(token12, Ok(data::Token::Or)));
+
+        let token13 = lexer.next().unwrap().data;
+        assert!(matches!(token13, Ok(data::Token::NotEqual)));
+
+        let token14 = lexer.next().unwrap().data;
+        assert!(matches!(token14, Ok(data::Token::Less)));
+
+        let token15 = lexer.next().unwrap().data;
+        assert!(matches!(token15, Ok(data::Token::Greater)));
+
+        let token16 = lexer.next().unwrap().data;
+        assert!(matches!(token16, Ok(data::Token::LessEqual)));
+
+        let token17 = lexer.next().unwrap().data;
+        assert!(matches!(token17, Ok(data::Token::GreaterEqual)));
+
+        let token18 = lexer.next().unwrap().data;
+        assert!(matches!(token18, Ok(data::Token::Shl)));
+
+        let token19 = lexer.next().unwrap().data;
+        assert!(matches!(token19, Ok(data::Token::Shr)));
+
         assert!(lexer.next().is_none());
     }
-
     #[test]
     fn test_integer_overflow() {
         let input = "9999999999999999999999999999999999999999999999999999999999999999999999999999";

@@ -179,7 +179,7 @@ impl<'a, R: Read> Lexer<'a, R> {
 
         Ok(Token::I64(current))
     }
-    fn parse_plus_family(&mut self) -> Result<Token, String> {
+    fn parse_plus(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
                 self.next_char();
@@ -188,25 +188,36 @@ impl<'a, R: Read> Lexer<'a, R> {
             _ => Ok(Token::Plus),
         }
     }
-    fn parse_minus_family(&mut self) -> Result<Token, String> {
+
+    fn parse_minus(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
                 self.next_char();
                 Ok(Token::MinusEqual)
             }
+            Some('>') => {
+                self.next_char();
+                Ok(Token::Arrow)
+            }
             _ => Ok(Token::Minus),
         }
     }
-    fn parse_equal_family(&mut self) -> Result<Token, String> {
+
+    fn parse_equal(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
                 self.next_char();
                 Ok(Token::EqualEqual)
             }
+            Some('>') => {
+                self.next_char();
+                Ok(Token::FatArrow)
+            }
             _ => Ok(Token::Equal),
         }
     }
-    fn parse_star_family(&mut self) -> Result<Token, String> {
+
+    fn parse_star(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
                 self.next_char();
@@ -215,7 +226,8 @@ impl<'a, R: Read> Lexer<'a, R> {
             _ => Ok(Token::Star),
         }
     }
-    fn parse_divide_family(&mut self) -> Result<Token, String> {
+
+    fn parse_divide(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
                 self.next_char();
@@ -224,6 +236,135 @@ impl<'a, R: Read> Lexer<'a, R> {
             _ => Ok(Token::Divide),
         }
     }
+
+    fn parse_percent(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::PercentEqual)
+            }
+            _ => Ok(Token::Percent),
+        }
+    }
+
+    fn parse_bitand(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::BitAndEqual)
+            }
+            Some('&') => {
+                self.next_char();
+                Ok(Token::And)
+            }
+            _ => Ok(Token::BitAnd),
+        }
+    }
+
+    fn parse_bitor(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::BitOrEqual)
+            }
+            Some('|') => {
+                self.next_char();
+                Ok(Token::Or)
+            }
+            _ => Ok(Token::BitOr),
+        }
+    }
+
+    fn parse_bitxor(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::BitXorEqual)
+            }
+            _ => Ok(Token::BitXor),
+        }
+    }
+
+    fn parse_not(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::NotEqual)
+            }
+            _ => Ok(Token::Not),
+        }
+    }
+
+    fn parse_greater(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::GreaterEqual)
+            }
+            Some('>') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Ok(Token::ShrEqual)
+                    }
+                    _ => Ok(Token::Shr),
+                }
+            }
+            _ => Ok(Token::Greater),
+        }
+    }
+
+    fn parse_less(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('=') => {
+                self.next_char();
+                Ok(Token::LessEqual)
+            }
+            Some('<') => {
+                self.next_char();
+                match self.peek() {
+                    Some('=') => {
+                        self.next_char();
+                        Ok(Token::ShlEqual)
+                    }
+                    _ => Ok(Token::Shl),
+                }
+            }
+            _ => Ok(Token::Less),
+        }
+    }
+
+    fn parse_dot(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some('.') => {
+                self.next_char();
+                match self.peek() {
+                    Some('.') => {
+                        self.next_char();
+                        Ok(Token::DotDotDot)
+                    }
+                    Some('=') => {
+                        self.next_char();
+                        Ok(Token::DotDotEq)
+                    }
+                    _ => Ok(Token::DotDot),
+                }
+            }
+            _ => Ok(Token::Dot),
+        }
+    }
+
+    fn parse_colon(&mut self) -> Result<Token, String> {
+        match self.peek() {
+            Some(':') => {
+                self.next_char();
+                Ok(Token::ColonColon)
+            }
+            _ => Ok(Token::Colon),
+        }
+    }
+
     fn parse_single_char(&mut self, string: bool) -> Result<char, CharError> {
         let terminator = if string { '"' } else { '\'' };
         loop {
@@ -339,11 +480,20 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
         let location = self.location.clone();
 
         let data = match c {
-            '+' => self.parse_plus_family(),
-            '-' => self.parse_minus_family(),
-            '=' => self.parse_equal_family(),
-            '*' => self.parse_star_family(),
-            '/' => self.parse_divide_family(),
+            '+' => self.parse_plus(),
+            '-' => self.parse_minus(),
+            '=' => self.parse_equal(),
+            '*' => self.parse_star(),
+            '/' => self.parse_divide(),
+            '%' => self.parse_percent(),
+            '&' => self.parse_bitand(),
+            '|' => self.parse_bitor(),
+            '^' => self.parse_bitxor(),
+            '!' => self.parse_not(),
+            '>' => self.parse_greater(),
+            '<' => self.parse_less(),
+            '.' => self.parse_dot(),
+            ':' => self.parse_colon(),
             '0'..='9' => {
                 self.unput(Some(c));
                 self.parse_i64()
@@ -351,6 +501,12 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
             'a'..='z' | 'A'..='Z' | '_' => self.parse_id(c),
             '\'' => self.parse_char(),
             '"' => self.parse_string(),
+            ',' => Ok(Token::Comma),
+            ';' => Ok(Token::Semi),
+            '@' => Ok(Token::At),
+            '#' => Ok(Token::Hash),
+            '$' => Ok(Token::Dollar),
+            '?' => Ok(Token::Question),
             _ => Err(String::from("unknown character")),
         };
 
