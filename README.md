@@ -16,6 +16,8 @@ This is a simple compiler project written in Rust. It demonstrates the basic pri
 - Error reporting with location information
 - Integer overflow detection during parsing
 - Support for additional symbols (., .., ..., ..=, =>, ->, ::, :, ;, ,, @, _, #, $, ?)
+- Improved code readability and maintainability through function decomposition
+- Comprehensive test suite covering various language features
 
 ## Building
 
@@ -23,3 +25,20 @@ To build the project:
 
 ```bash
 cargo build
+```
+
+## Running
+
+To run the project:
+
+```bash
+cargo run
+```
+
+## Testing
+
+To run the tests:
+
+```bash
+cargo test
+```

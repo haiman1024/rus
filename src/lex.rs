@@ -155,30 +155,232 @@ impl<'a, R: Read> Lexer<'a, R> {
             }
         }
     }
-    fn parse_i64(&mut self) -> Result<Token, String> {
-        let mut current: i64 = 0;
-        let mut digits = std::iter::from_fn(|| match self.peek() {
-            Some(c) if c.is_ascii_digit() => {
-                self.next_char();
-                Some(c as i64 - '0' as i64)
-            }
-            _ => None,
-        });
 
-        while let Some(digit) = digits.next() {
-            match current.checked_mul(10).and_then(|c| c.checked_add(digit)) {
-                Some(c) => {
-                    current = c;
+    /// 解析数字字面量的主要函数
+    fn parse_number(&mut self) -> Result<Token, String> {
+        let mut number_str = String::new();
+        let mut has_decimal_point = false;
+        let mut has_exponent = false;
+
+        // Collect the integer part
+        while let Some(c) = self.peek() {
+            if c.is_ascii_digit() {
+                self.next_char();
+                number_str.push(c);
+            } else {
+                break;
+            }
+        }
+
+        // Check for decimal point
+        if let Some('.') = self.peek() {
+            // Check if the character after '.' is a digit
+            self.next_char(); // consume '.'
+            if let Some(c) = self.peek() {
+                if c.is_ascii_digit() {
+                    number_str.push('.');
+                    has_decimal_point = true;
+                    self.next_char(); // consume the digit
+                    number_str.push(c);
+
+                    // Collect remaining fractional digits
+                    while let Some(c) = self.peek() {
+                        if c.is_ascii_digit() {
+                            self.next_char();
+                            number_str.push(c);
+                        } else {
+                            break;
+                        }
+                    }
+                } else {
+                    // Put back the '.' if it's not followed by a digit
+                    self.unput(Some('.'));
                 }
-                None => {
-                    while digits.next().is_some() {}
-                    return Err(String::from("Overflow while parsing integer literal"));
+            } else {
+                // Put back the '.' if it's at the end
+                self.unput(Some('.'));
+            }
+        }
+
+        // Check for exponent
+        if !has_exponent && let Some(c) = self.peek().filter(|&c| c == 'e' || c == 'E') {
+            self.next_char();
+            number_str.push(c);
+            has_exponent = true;
+
+            // Check for exponent sign
+            if let Some(sign) = self.peek().filter(|&sign| sign == '+' || sign == '-') {
+                self.next_char();
+                number_str.push(sign);
+            }
+
+            // Must have at least one digit in exponent
+            let mut has_exp_digits = false;
+            while let Some(c) = self.peek() {
+                if c.is_ascii_digit() {
+                    self.next_char();
+                    number_str.push(c);
+                    has_exp_digits = true;
+                } else {
+                    break;
+                }
+            }
+
+            if !has_exp_digits {
+                return Err(String::from("Expected at least one digit in exponent"));
+            }
+        }
+
+        // Parse suffix if any
+        let suffix = self.parse_integer_suffix();
+
+        // Determine if this is a float or integer
+        if has_decimal_point || has_exponent {
+            // This is a float literal
+            match suffix.as_str() {
+                "f32" => match number_str.parse::<f32>() {
+                    Ok(value) => Ok(Token::F32(value)),
+                    Err(_) => Err(String::from("Invalid f32 literal")),
+                },
+                "f64" | "" => match number_str.parse::<f64>() {
+                    Ok(value) => Ok(Token::F64(value)),
+                    Err(_) => Err(String::from("Invalid f64 literal")),
+                },
+                _ => {
+                    // Try to parse as the specified float type
+                    if suffix.starts_with('f') {
+                        match number_str.parse::<f64>() {
+                            Ok(value) => Ok(Token::F64(value)),
+                            Err(_) => Err(String::from("Invalid float literal")),
+                        }
+                    } else {
+                        Err(format!("Invalid suffix for float literal: {}", suffix))
+                    }
+                }
+            }
+        } else {
+            // This is an integer literal
+            // Parse as i64 first for range checking
+            match number_str.parse::<i64>() {
+                Ok(value) => self.convert_integer(value, &suffix),
+                Err(_) => Err(String::from("Overflow while parsing integer literal")),
+            }
+        }
+    }
+
+    fn convert_integer(&mut self, value: i64, suffix: &str) -> Result<Token, String> {
+        match suffix {
+            "i8" => {
+                if value > i8::MAX as i64 || value < i8::MIN as i64 {
+                    Err(String::from("Integer literal out of range for i8"))
+                } else {
+                    Ok(Token::I8(value as i8))
+                }
+            }
+            "i16" => {
+                if value > i16::MAX as i64 || value < i16::MIN as i64 {
+                    Err(String::from("Integer literal out of range for i16"))
+                } else {
+                    Ok(Token::I16(value as i16))
+                }
+            }
+            "i32" => {
+                if value > i32::MAX as i64 || value < i32::MIN as i64 {
+                    Err(String::from("Integer literal out of range for i32"))
+                } else {
+                    Ok(Token::I32(value as i32))
+                }
+            }
+            "i64" => Ok(Token::I64(value)),
+            "i128" => Ok(Token::I128(value as i128)),
+            "u8" => {
+                if value > u8::MAX as i64 || value < 0 {
+                    Err(String::from("Integer literal out of range for u8"))
+                } else {
+                    Ok(Token::U8(value as u8))
+                }
+            }
+            "u16" => {
+                if value > u16::MAX as i64 || value < 0 {
+                    Err(String::from("Integer literal out of range for u16"))
+                } else {
+                    Ok(Token::U16(value as u16))
+                }
+            }
+            "u32" => {
+                if value > u32::MAX as i64 || value < 0 {
+                    Err(String::from("Integer literal out of range for u32"))
+                } else {
+                    Ok(Token::U32(value as u32))
+                }
+            }
+            "u64" => {
+                if value < 0 {
+                    Err(String::from("Integer literal out of range for u64"))
+                } else {
+                    Ok(Token::U64(value as u64))
+                }
+            }
+            "u128" => {
+                if value < 0 {
+                    Err(String::from("Integer literal out of range for u128"))
+                } else {
+                    Ok(Token::U128(value as u128))
+                }
+            }
+            "isize" => Ok(Token::Isize(value as isize)),
+            "usize" => {
+                if value < 0 {
+                    Err(String::from("Integer literal out of range for usize"))
+                } else {
+                    Ok(Token::Usize(value as usize))
+                }
+            }
+            "" => {
+                // Default to i32 if within range
+                if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
+                    Ok(Token::I32(value as i32))
+                } else {
+                    Err(String::from("Integer literal out of default i32 range"))
+                }
+            }
+            _ => Err(format!("Invalid integer suffix: {}", suffix)),
+        }
+    }
+
+    fn parse_integer_suffix(&mut self) -> String {
+        let mut suffix = String::new();
+
+        // Check if next char starts a valid suffix
+        if let Some(c) = self.peek().filter(|c| c.is_ascii_alphabetic()) {
+            self.next_char();
+            suffix.push(c);
+
+            // Continue collecting alphanumeric characters
+            while let Some(next_c) = self.peek() {
+                if next_c.is_ascii_alphanumeric() {
+                    self.next_char();
+                    suffix.push(next_c);
+                } else {
+                    break;
                 }
             }
         }
 
-        Ok(Token::I64(current))
+        // Check if the suffix is valid
+        match suffix.as_str() {
+            "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "u128"
+            | "isize" | "usize" | "f32" | "f64" => suffix,
+            _ => {
+                // Put back characters if not a valid suffix
+                for c in suffix.chars().rev() {
+                    self.unput(Some(c));
+                }
+                String::new()
+            }
+        }
     }
+
     fn parse_plus(&mut self) -> Result<Token, String> {
         match self.peek() {
             Some('=') => {
@@ -492,11 +694,20 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
             '!' => self.parse_not(),
             '>' => self.parse_greater(),
             '<' => self.parse_less(),
-            '.' => self.parse_dot(),
+            '.' => {
+                // Check if this is a float starting with a decimal point
+                match self.peek() {
+                    Some(c) if c.is_ascii_digit() => {
+                        self.unput(Some('.'));
+                        self.parse_number()
+                    }
+                    _ => self.parse_dot(),
+                }
+            }
             ':' => self.parse_colon(),
             '0'..='9' => {
                 self.unput(Some(c));
-                self.parse_i64()
+                self.parse_number()
             }
             'a'..='z' | 'A'..='Z' | '_' => self.parse_id(c),
             '\'' => self.parse_char(),
