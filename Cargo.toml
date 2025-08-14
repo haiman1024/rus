@@ -3,7 +3,7 @@ name = "rus"
 version = "0.1.0"
 edition = "2024"
 authors = ["HaiMan <alexredskaber@gmail.com>"]
-description = "A Rust compiler written in Rust"
+description = "A compiler for the Rus language"
 repository = "https://github.com/haiman/rus"
 readme = "README.md"
 license = "Apache License 2.0"
@@ -18,6 +18,22 @@ phf = { version = "0.12.1", features = ["macros"] }
 [lib]
 name = "rus"
 path = "src/lib.rs"
+
+[[test]]
+name = "lexer_tests"
+path = "test/lexer/basic_tokens.rs"
+
+[[test]]
+name = "number_parsing_tests"
+path = "test/lexer/number_parsing.rs"
+
+[[test]]
+name = "string_parsing_tests"
+path = "test/lexer/string_parsing.rs"
+
+[[test]]
+name = "integration_tests"
+path = "test/integration/complete_program.rs"
 
 [[bin]]
 name = "rus"

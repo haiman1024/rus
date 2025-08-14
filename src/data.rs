@@ -1,89 +1,159 @@
-#[derive(Debug)]
+use std::fmt;
+
+#[derive(Debug, PartialEq)]
 pub enum Token {
-    // arithmetic operators
-    Plus,
-    Minus,
-    Star,
-    Divide,
-    Percent, // %
+    // 核心关键字，直接体现语言哲学
+    Fn,       // fn
+    Let,      // let
+    Var,      // var
+    With,     // with
+    Contract, // contract
+    Impl,     // impl
+    Mut,      // mut (作为一个独立的关键字)
 
-    // bitwise operators
-    BitAnd, // &
-    BitOr,  // |
-    BitXor, // ^
-    Shl,    // <<
-    Shr,    // >>
-    BitNot, // !
+    // 控制流与其他通用关键字
+    If,
+    Else,
+    For,
+    In,
+    Loop,
+    While,
+    Match,
+    Break,
+    Continue,
+    Return,
+    As,
+    Use,
+    Pub,
+    Enum,
+    Struct,
+    Trait,
 
-    // comparison operators
-    EqualEqual,   // ==
-    NotEqual,     // !=
-    Less,         // <
-    LessEqual,    // <=
-    Greater,      // >
-    GreaterEqual, // >=
+    // 布尔字面量
+    True,
+    False,
 
-    // assignment operators
-    Equal,        // =
-    PlusEqual,    // +=
-    MinusEqual,   // -=
-    StarEqual,    // *=
-    DivideEqual,  // /=
-    PercentEqual, // %=
-    BitAndEqual,  // &=
-    BitOrEqual,   // |=
-    BitXorEqual,  // ^=
-    ShlEqual,     // <<=
-    ShrEqual,     // >>=
+    // 补充 Async, Await, Try 关键字
+    Async,
+    Await,
+    Try,
 
-    // logical operators
-    And, // &&
-    Or,  // ||
+    // 字面量：细粒度类型，但识别形态
+    IntegerLiteral(String),
+    FloatLiteral(String),
+    StringLiteral(String),
+    CharLiteral(char),
 
-    // other operators
-    Not,        // !
+    // 标识符：代表细粒度的命名
+    Identifier(String),
+
+    // 单字符操作符与分隔符，语义的区分留给语法分析器
+    Plus,       // +
+    Minus,      // -
+    Star,       // *
+    Slash,      // /
+    Percent,    // %
+    Ampersand,  // & (统一为 Ampersand)
+    Pipe,       // |
+    Caret,      // ^
+    Bang,       // !
+    Equal,      // =
+    Less,       // <
+    Greater,    // >
     Dot,        // .
-    DotDot,     // ..
-    DotDotDot,  // ...
-    DotDotEq,   // ..=
     Comma,      // ,
-    Semi,       // ;
+    Semicolon,  // ;
     Colon,      // :
-    ColonColon, // ::
-    Arrow,      // ->
-    FatArrow,   // =>
+    Question,   // ?
     At,         // @
-    Underscore, // _
     Hash,       // #
     Dollar,     // $
-    Question,   // ?
+    Underscore, // _
 
-    // literals
-    I8(i8),
-    I16(i16),
-    I32(i32),
-    I64(i64),
-    I128(i128),
-    U8(u8),
-    U16(u16),
-    U32(u32),
-    U64(u64),
-    U128(u128),
-    F32(f32),
-    F64(f64),
-    Isize(isize),
-    Usize(usize),
-    String(String),
-    Char(char),
+    // 多字符操作符
+    PlusEqual,      // +=
+    MinusEqual,     // -=
+    StarEqual,      // *=
+    SlashEqual,     // /=
+    PercentEqual,   // %=
+    AmpersandEqual, // &=
+    PipeEqual,      // |=
+    CaretEqual,     // ^=
+    ShlEqual,       // <<=
+    ShrEqual,       // >>=
+    MutRef,         // &mut (作为原子记号，体现线性类型)
+    PathSep,        // ::
+    Arrow,          // ->
+    FatArrow,       // =>
+    EqualEqual,     // ==
+    BangEqual,      // !=
+    LessEqual,      // <=
+    GreaterEqual,   // >=
+    And,            // &&
+    Or,             // ||
+    Shl,            // <<
+    Shr,            // >>
+    Range,          // ..
+    RangeInclusive, // ..=
 
-    // identifiers and keywords
-    Id(String),
-    Keyword(Keyword),
+    // 括号与分隔符
+    LParen,   // (
+    RParen,   // )
+    LBrace,   // {
+    RBrace,   // }
+    LBracket, // [
+    RBracket, // ]
+
+    // 文件结束和错误
+    Eof,
+    Error(LexicalError),
 }
 
-// holds where a piece of code came from
-// should almost always be a immutable reference
-#[derive(Clone, Debug)]
+/// 词法分析错误类型，提供更精确的错误信息
+#[derive(Debug, PartialEq)]
+pub enum LexicalError {
+    /// 未知字符
+    UnknownCharacter(char),
+    /// 字符串字面量未正确终止
+    UnterminatedString,
+    /// 字符字面量未正确终止
+    UnterminatedChar,
+    /// 字符字面量为空
+    EmptyCharLiteral,
+    /// 字符字面量包含多个字符
+    MultipleCharactersInCharLiteral,
+    /// 未知的转义序列
+    UnknownEscapeSequence(char),
+    /// 文件结束时遇到未完成的字面量
+    UnexpectedEofInLiteral,
+    /// 数字格式错误
+    InvalidNumberFormat,
+}
+
+impl fmt::Display for LexicalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            LexicalError::UnknownCharacter(c) => write!(f, "Unknown character: '{}'", c),
+            LexicalError::UnterminatedString => write!(f, "Unterminated string literal"),
+            LexicalError::UnterminatedChar => write!(f, "Unterminated character literal"),
+            LexicalError::EmptyCharLiteral => write!(f, "Empty character literal"),
+            LexicalError::MultipleCharactersInCharLiteral => {
+                write!(f, "Multiple characters in character literal")
+            }
+            LexicalError::UnknownEscapeSequence(c) => write!(f, "Unknown escape sequence: \\{}", c),
+            LexicalError::UnexpectedEofInLiteral => write!(f, "Unexpected end of file in literal"),
+            LexicalError::InvalidNumberFormat => write!(f, "Invalid number format"),
+        }
+    }
+}
+
+impl fmt::Display for Token {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{:?}", self)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Location<'a> {
     pub line: usize,
     pub column: usize,
@@ -96,95 +166,48 @@ pub struct Locatable<'a, T> {
     pub data: T,
 }
 
-#[derive(Clone, Copy, Debug)]
+// 为Token实现From trait，方便创建Locatable<Token>
+impl<'a> From<(Location<'a>, Token)> for Locatable<'a, Token> {
+    fn from((location, data): (Location<'a>, Token)) -> Self {
+        Locatable { location, data }
+    }
+}
+
+// 为LexicalError实现From trait，方便创建Locatable<LexicalError>
+impl<'a> From<(Location<'a>, LexicalError)> for Locatable<'a, LexicalError> {
+    fn from((location, data): (Location<'a>, LexicalError)) -> Self {
+        Locatable { location, data }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Keyword {
-    // Strict keywords
-    As,
-    Break,
-    Const,
-    Continue,
-    Crate,
-    Else,
-    Enum,
-    Extern,
-    False,
     Fn,
-    For,
-    If,
-    Impl,
-    In,
     Let,
-    Loop,
-    Match,
-    Mod,
-    Move,
+    Var,
+    With,
+    Contract,
+    Impl,
     Mut,
-    Pub,
-    Ref,
+    If,
+    Else,
+    For,
+    In,
+    Loop,
+    While,
+    Match,
+    Break,
+    Continue,
     Return,
-    SelfValue, // self
-    SelfType,  // Self
-    Static,
+    As,
+    Use,
+    Pub,
+    Enum,
     Struct,
-    Super,
     Trait,
     True,
-    Type,
-    Unsafe,
-    Use,
-    Where,
-    While,
-
-    // Reserved keywords
-    Abstract,
-    Become,
-    Box,
-    Do,
-    Final,
-    Macro,
-    Override,
-    Priv,
-    Typeof,
-    Unsized,
-    Virtual,
-    Yield,
-
-    // Weak keywords (contextual)
+    False,
     Async,
     Await,
-    Dyn,
-    Union,
     Try,
-    Underscore, // _
-
-    // Additional type keywords
-    I8,
-    I16,
-    I32,
-    I64,
-    I128,
-    U8,
-    U16,
-    U32,
-    U64,
-    U128,
-    F32,
-    F64,
-    Isize,
-    Usize,
-    Bool,
-    CharType, // Char is already used for character literals, so using CharType
-    Str,      // String type
-    Option,
-    Result,
-    Vec,
-    Slice,
-    Array,
-    Tuple,
-    Unit,       // ()
-    Never,      // !
-    Reference,  // &
-    RawPointer, // *const, *mut
-    FnPointer,  // fn()
-    Closure,    // || {}
 }

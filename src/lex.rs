@@ -2,97 +2,39 @@ use std::io::{BufRead, BufReader, Read};
 use std::iter::IntoIterator;
 use std::vec::IntoIter;
 
-use super::data::{Keyword, Locatable, Location, Token};
+use super::data::{Keyword, LexicalError, Locatable, Location, Token};
 use phf::Map;
 
 static KEYWORDS: Map<&'static str, Keyword> = phf::phf_map! {
-    // Strict keywords
-    "as" => Keyword::As,
-    "break" => Keyword::Break,
-    "const" => Keyword::Const,
-    "continue" => Keyword::Continue,
-    "crate" => Keyword::Crate,
-    "else" => Keyword::Else,
-    "enum" => Keyword::Enum,
-    "extern" => Keyword::Extern,
-    "false" => Keyword::False,
     "fn" => Keyword::Fn,
-    "for" => Keyword::For,
-    "if" => Keyword::If,
-    "impl" => Keyword::Impl,
-    "in" => Keyword::In,
     "let" => Keyword::Let,
-    "loop" => Keyword::Loop,
-    "match" => Keyword::Match,
-    "mod" => Keyword::Mod,
-    "move" => Keyword::Move,
+    "var" => Keyword::Var,
+    "with" => Keyword::With,
+    "contract" => Keyword::Contract,
+    "impl" => Keyword::Impl,
     "mut" => Keyword::Mut,
-    "pub" => Keyword::Pub,
-    "ref" => Keyword::Ref,
+    "if" => Keyword::If,
+    "else" => Keyword::Else,
+    "for" => Keyword::For,
+    "in" => Keyword::In,
+    "loop" => Keyword::Loop,
+    "while" => Keyword::While,
+    "match" => Keyword::Match,
+    "break" => Keyword::Break,
+    "continue" => Keyword::Continue,
     "return" => Keyword::Return,
-    "self" => Keyword::SelfValue,
-    "Self" => Keyword::SelfType,
-    "static" => Keyword::Static,
+    "as" => Keyword::As,
+    "use" => Keyword::Use,
+    "pub" => Keyword::Pub,
+    "enum" => Keyword::Enum,
     "struct" => Keyword::Struct,
-    "super" => Keyword::Super,
     "trait" => Keyword::Trait,
     "true" => Keyword::True,
-    "type" => Keyword::Type,
-    "unsafe" => Keyword::Unsafe,
-    "use" => Keyword::Use,
-    "where" => Keyword::Where,
-    "while" => Keyword::While,
-
-    // Reserved keywords
-    "abstract" => Keyword::Abstract,
-    "become" => Keyword::Become,
-    "box" => Keyword::Box,
-    "do" => Keyword::Do,
-    "final" => Keyword::Final,
-    "macro" => Keyword::Macro,
-    "override" => Keyword::Override,
-    "priv" => Keyword::Priv,
-    "typeof" => Keyword::Typeof,
-    "unsized" => Keyword::Unsized,
-    "virtual" => Keyword::Virtual,
-    "yield" => Keyword::Yield,
-
-    // Weak keywords (contextual)
+    "false" => Keyword::False,
     "async" => Keyword::Async,
     "await" => Keyword::Await,
-    "dyn" => Keyword::Dyn,
-    "union" => Keyword::Union,
     "try" => Keyword::Try,
-    "_" => Keyword::Underscore,
-
-    // Additional type keywords
-    "i8" => Keyword::I8,
-    "i16" => Keyword::I16,
-    "i32" => Keyword::I32,
-    "i64" => Keyword::I64,
-    "i128" => Keyword::I128,
-    "u8" => Keyword::U8,
-    "u16" => Keyword::U16,
-    "u32" => Keyword::U32,
-    "u64" => Keyword::U64,
-    "u128" => Keyword::U128,
-    "f32" => Keyword::F32,
-    "f64" => Keyword::F64,
-    "isize" => Keyword::Isize,
-    "usize" => Keyword::Usize,
-    "bool" => Keyword::Bool,
-    "char" => Keyword::CharType,
-    "str" => Keyword::Str,
-    "option" => Keyword::Option,
-    "result" => Keyword::Result,
-    "vec" => Keyword::Vec,
 };
-
-enum CharError {
-    Eof,
-    Newline,
-    Terminator,
-}
 
 pub struct Lexer<'a, R: Read> {
     location: Location<'a>,
@@ -105,7 +47,7 @@ impl<'a, R: Read> Lexer<'a, R> {
     pub fn new(filename: &'a str, stream: BufReader<R>) -> Lexer<'a, R> {
         Lexer {
             location: Location {
-                line: 0,
+                line: 1,
                 column: 0,
                 file: filename,
             },
@@ -116,8 +58,7 @@ impl<'a, R: Read> Lexer<'a, R> {
     }
 
     fn next_char(&mut self) -> Option<char> {
-        if let Some(c) = self.current {
-            self.current = None;
+        if let Some(c) = self.current.take() {
             Some(c)
         } else {
             match self.iterator.next() {
@@ -131,6 +72,9 @@ impl<'a, R: Read> Lexer<'a, R> {
                         eprintln!("FATAL: Error reading line: {}", msg);
                         return None;
                     }
+                    if buf.is_empty() {
+                        return None;
+                    }
                     self.location.line += 1;
                     self.location.column = 1;
                     self.iterator = buf.chars().collect::<Vec<_>>().into_iter();
@@ -139,13 +83,21 @@ impl<'a, R: Read> Lexer<'a, R> {
             }
         }
     }
+
     fn unput(&mut self, c: Option<char>) {
         self.current = c;
+        if self.location.column > 0 && c.is_some() {
+            self.location.column -= 1;
+        }
     }
+
     fn peek(&mut self) -> Option<char> {
-        self.current = self.next_char();
+        if self.current.is_none() {
+            self.current = self.next_char();
+        }
         self.current
     }
+
     fn skip_whitespace(&mut self) {
         while let Some(c) = self.peek() {
             if c.is_ascii_whitespace() {
@@ -156,34 +108,92 @@ impl<'a, R: Read> Lexer<'a, R> {
         }
     }
 
-    /// 解析数字字面量的主要函数
-    fn parse_number(&mut self) -> Result<Token, String> {
+    fn parse_number(&mut self) -> Result<Token, LexicalError> {
         let mut number_str = String::new();
-        let mut has_decimal_point = false;
-        let mut has_exponent = false;
+        let mut is_float = false;
 
-        // Collect the integer part
-        while let Some(c) = self.peek() {
-            if c.is_ascii_digit() {
-                self.next_char();
-                number_str.push(c);
-            } else {
-                break;
+        // 检查数字前缀以支持不同进制
+        let (radix, has_prefix) = if self.peek() == Some('0') {
+            self.next_char(); // 消费 '0'
+            match self.peek() {
+                Some('x') | Some('X') => {
+                    self.next_char(); // 消费 'x' 或 'X'
+                    (16, true) // 十六进制
+                }
+                Some('o') | Some('O') => {
+                    self.next_char(); // 消费 'o' 或 'O'
+                    (8, true) // 八进制
+                }
+                Some('b') | Some('B') => {
+                    self.next_char(); // 消费 'b' 或 'B'
+                    (2, true) // 二进制
+                }
+                Some('.') | Some('e') | Some('E') | None => {
+                    // 这是十进制数，以0开头
+                    number_str.push('0');
+                    (10, false)
+                }
+                Some(c) if c.is_ascii_digit() => {
+                    // 以0开头的八进制数（传统表示法）
+                    number_str.push('0');
+                    (8, false)
+                }
+                _ => {
+                    number_str.push('0');
+                    (10, false)
+                }
             }
-        }
+        } else {
+            (10, false) // 默认十进制
+        };
 
-        // Check for decimal point
-        if let Some('.') = self.peek() {
-            // Check if the character after '.' is a digit
-            self.next_char(); // consume '.'
-            if let Some(c) = self.peek() {
-                if c.is_ascii_digit() {
-                    number_str.push('.');
-                    has_decimal_point = true;
-                    self.next_char(); // consume the digit
-                    number_str.push(c);
-
-                    // Collect remaining fractional digits
+        // 解析整数部分
+        match radix {
+            16 => {
+                // 对于十六进制，我们需要包含前缀在字符串中
+                if has_prefix {
+                    number_str.push_str("0x");
+                }
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_hexdigit() {
+                        self.next_char();
+                        number_str.push(c);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            8 => {
+                // 对于八进制，我们需要包含前缀在字符串中
+                if has_prefix {
+                    number_str.push_str("0o");
+                }
+                while let Some(c) = self.peek() {
+                    if ('0'..='7').contains(&c) {
+                        self.next_char();
+                        number_str.push(c);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            2 => {
+                // 对于二进制，我们需要包含前缀在字符串中
+                if has_prefix {
+                    number_str.push_str("0b");
+                }
+                while let Some(c) = self.peek() {
+                    if c == '0' || c == '1' {
+                        self.next_char();
+                        number_str.push(c);
+                    } else {
+                        break;
+                    }
+                }
+            }
+            10 => {
+                // 原有的十进制解析逻辑
+                if radix == 10 && number_str.is_empty() {
                     while let Some(c) = self.peek() {
                         if c.is_ascii_digit() {
                             self.next_char();
@@ -192,488 +202,148 @@ impl<'a, R: Read> Lexer<'a, R> {
                             break;
                         }
                     }
-                } else {
-                    // Put back the '.' if it's not followed by a digit
-                    self.unput(Some('.'));
                 }
-            } else {
-                // Put back the '.' if it's at the end
-                self.unput(Some('.'));
             }
+            _ => unreachable!(),
         }
 
-        // Check for exponent
-        if !has_exponent && let Some(c) = self.peek().filter(|&c| c == 'e' || c == 'E') {
-            self.next_char();
-            number_str.push(c);
-            has_exponent = true;
-
-            // Check for exponent sign
-            if let Some(sign) = self.peek().filter(|&sign| sign == '+' || sign == '-') {
+        // 处理小数部分（仅适用于十进制）
+        if radix == 10 && !is_float {
+            if let Some('.') = self.peek() {
                 self.next_char();
-                number_str.push(sign);
-            }
-
-            // Must have at least one digit in exponent
-            let mut has_exp_digits = false;
-            while let Some(c) = self.peek() {
-                if c.is_ascii_digit() {
-                    self.next_char();
-                    number_str.push(c);
-                    has_exp_digits = true;
-                } else {
-                    break;
-                }
-            }
-
-            if !has_exp_digits {
-                return Err(String::from("Expected at least one digit in exponent"));
-            }
-        }
-
-        // Parse suffix if any
-        let suffix = self.parse_integer_suffix();
-
-        // Determine if this is a float or integer
-        if has_decimal_point || has_exponent {
-            // This is a float literal
-            match suffix.as_str() {
-                "f32" => match number_str.parse::<f32>() {
-                    Ok(value) => Ok(Token::F32(value)),
-                    Err(_) => Err(String::from("Invalid f32 literal")),
-                },
-                "f64" | "" => match number_str.parse::<f64>() {
-                    Ok(value) => Ok(Token::F64(value)),
-                    Err(_) => Err(String::from("Invalid f64 literal")),
-                },
-                _ => {
-                    // Try to parse as the specified float type
-                    if suffix.starts_with('f') {
-                        match number_str.parse::<f64>() {
-                            Ok(value) => Ok(Token::F64(value)),
-                            Err(_) => Err(String::from("Invalid float literal")),
+                if let Some(c) = self.peek() {
+                    if c.is_ascii_digit() {
+                        is_float = true;
+                        number_str.push('.');
+                        self.next_char();
+                        number_str.push(c);
+                        while let Some(c) = self.peek() {
+                            if c.is_ascii_digit() {
+                                self.next_char();
+                                number_str.push(c);
+                            } else {
+                                break;
+                            }
                         }
                     } else {
-                        Err(format!("Invalid suffix for float literal: {}", suffix))
+                        self.unput(Some('.'));
                     }
+                } else {
+                    self.unput(Some('.'));
                 }
             }
-        } else {
-            // This is an integer literal
-            // Parse as i64 first for range checking
-            match number_str.parse::<i64>() {
-                Ok(value) => self.convert_integer(value, &suffix),
-                Err(_) => Err(String::from("Overflow while parsing integer literal")),
-            }
-        }
-    }
 
-    fn convert_integer(&mut self, value: i64, suffix: &str) -> Result<Token, String> {
-        match suffix {
-            "i8" => {
-                if value > i8::MAX as i64 || value < i8::MIN as i64 {
-                    Err(String::from("Integer literal out of range for i8"))
-                } else {
-                    Ok(Token::I8(value as i8))
-                }
-            }
-            "i16" => {
-                if value > i16::MAX as i64 || value < i16::MIN as i64 {
-                    Err(String::from("Integer literal out of range for i16"))
-                } else {
-                    Ok(Token::I16(value as i16))
-                }
-            }
-            "i32" => {
-                if value > i32::MAX as i64 || value < i32::MIN as i64 {
-                    Err(String::from("Integer literal out of range for i32"))
-                } else {
-                    Ok(Token::I32(value as i32))
-                }
-            }
-            "i64" => Ok(Token::I64(value)),
-            "i128" => Ok(Token::I128(value as i128)),
-            "u8" => {
-                if value > u8::MAX as i64 || value < 0 {
-                    Err(String::from("Integer literal out of range for u8"))
-                } else {
-                    Ok(Token::U8(value as u8))
-                }
-            }
-            "u16" => {
-                if value > u16::MAX as i64 || value < 0 {
-                    Err(String::from("Integer literal out of range for u16"))
-                } else {
-                    Ok(Token::U16(value as u16))
-                }
-            }
-            "u32" => {
-                if value > u32::MAX as i64 || value < 0 {
-                    Err(String::from("Integer literal out of range for u32"))
-                } else {
-                    Ok(Token::U32(value as u32))
-                }
-            }
-            "u64" => {
-                if value < 0 {
-                    Err(String::from("Integer literal out of range for u64"))
-                } else {
-                    Ok(Token::U64(value as u64))
-                }
-            }
-            "u128" => {
-                if value < 0 {
-                    Err(String::from("Integer literal out of range for u128"))
-                } else {
-                    Ok(Token::U128(value as u128))
-                }
-            }
-            "isize" => Ok(Token::Isize(value as isize)),
-            "usize" => {
-                if value < 0 {
-                    Err(String::from("Integer literal out of range for usize"))
-                } else {
-                    Ok(Token::Usize(value as usize))
-                }
-            }
-            "" => {
-                // Default to i32 if within range
-                if value >= i32::MIN as i64 && value <= i32::MAX as i64 {
-                    Ok(Token::I32(value as i32))
-                } else {
-                    Err(String::from("Integer literal out of default i32 range"))
-                }
-            }
-            _ => Err(format!("Invalid integer suffix: {}", suffix)),
-        }
-    }
-
-    fn parse_integer_suffix(&mut self) -> String {
-        let mut suffix = String::new();
-
-        // Check if next char starts a valid suffix
-        if let Some(c) = self.peek().filter(|c| c.is_ascii_alphabetic()) {
-            self.next_char();
-            suffix.push(c);
-
-            // Continue collecting alphanumeric characters
-            while let Some(next_c) = self.peek() {
-                if next_c.is_ascii_alphanumeric() {
+            // 处理科学计数法（仅适用于十进制浮点数）
+            if let Some(c) = self.peek().filter(|&c| c == 'e' || c == 'E') {
+                self.next_char();
+                number_str.push(c);
+                is_float = true;
+                if let Some(sign) = self.peek().filter(|&sign| sign == '+' || sign == '-') {
                     self.next_char();
-                    suffix.push(next_c);
-                } else {
-                    break;
+                    number_str.push(sign);
                 }
-            }
-        }
-
-        // Check if the suffix is valid
-        match suffix.as_str() {
-            "i8" | "i16" | "i32" | "i64" | "i128" | "u8" | "u16" | "u32" | "u64" | "u128"
-            | "isize" | "usize" | "f32" | "f64" => suffix,
-            _ => {
-                // Put back characters if not a valid suffix
-                for c in suffix.chars().rev() {
-                    self.unput(Some(c));
-                }
-                String::new()
-            }
-        }
-    }
-
-    fn parse_plus(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::PlusEqual)
-            }
-            _ => Ok(Token::Plus),
-        }
-    }
-
-    fn parse_minus(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::MinusEqual)
-            }
-            Some('>') => {
-                self.next_char();
-                Ok(Token::Arrow)
-            }
-            _ => Ok(Token::Minus),
-        }
-    }
-
-    fn parse_equal(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::EqualEqual)
-            }
-            Some('>') => {
-                self.next_char();
-                Ok(Token::FatArrow)
-            }
-            _ => Ok(Token::Equal),
-        }
-    }
-
-    fn parse_star(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::StarEqual)
-            }
-            _ => Ok(Token::Star),
-        }
-    }
-
-    fn parse_divide(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::DivideEqual)
-            }
-            _ => Ok(Token::Divide),
-        }
-    }
-
-    fn parse_percent(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::PercentEqual)
-            }
-            _ => Ok(Token::Percent),
-        }
-    }
-
-    fn parse_bitand(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::BitAndEqual)
-            }
-            Some('&') => {
-                self.next_char();
-                Ok(Token::And)
-            }
-            _ => Ok(Token::BitAnd),
-        }
-    }
-
-    fn parse_bitor(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::BitOrEqual)
-            }
-            Some('|') => {
-                self.next_char();
-                Ok(Token::Or)
-            }
-            _ => Ok(Token::BitOr),
-        }
-    }
-
-    fn parse_bitxor(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::BitXorEqual)
-            }
-            _ => Ok(Token::BitXor),
-        }
-    }
-
-    fn parse_not(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::NotEqual)
-            }
-            _ => Ok(Token::Not),
-        }
-    }
-
-    fn parse_greater(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::GreaterEqual)
-            }
-            Some('>') => {
-                self.next_char();
-                match self.peek() {
-                    Some('=') => {
+                while let Some(c) = self.peek() {
+                    if c.is_ascii_digit() {
                         self.next_char();
-                        Ok(Token::ShrEqual)
-                    }
-                    _ => Ok(Token::Shr),
-                }
-            }
-            _ => Ok(Token::Greater),
-        }
-    }
-
-    fn parse_less(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('=') => {
-                self.next_char();
-                Ok(Token::LessEqual)
-            }
-            Some('<') => {
-                self.next_char();
-                match self.peek() {
-                    Some('=') => {
-                        self.next_char();
-                        Ok(Token::ShlEqual)
-                    }
-                    _ => Ok(Token::Shl),
-                }
-            }
-            _ => Ok(Token::Less),
-        }
-    }
-
-    fn parse_dot(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some('.') => {
-                self.next_char();
-                match self.peek() {
-                    Some('.') => {
-                        self.next_char();
-                        Ok(Token::DotDotDot)
-                    }
-                    Some('=') => {
-                        self.next_char();
-                        Ok(Token::DotDotEq)
-                    }
-                    _ => Ok(Token::DotDot),
-                }
-            }
-            _ => Ok(Token::Dot),
-        }
-    }
-
-    fn parse_colon(&mut self) -> Result<Token, String> {
-        match self.peek() {
-            Some(':') => {
-                self.next_char();
-                Ok(Token::ColonColon)
-            }
-            _ => Ok(Token::Colon),
-        }
-    }
-
-    fn parse_single_char(&mut self, string: bool) -> Result<char, CharError> {
-        let terminator = if string { '"' } else { '\'' };
-        loop {
-            if let Some(c) = self.next_char() {
-                if c == '\\' {
-                    if let Some(c) = self.next_char() {
-                        return Ok(match c {
-                            '\n' => continue,
-                            'n' => '\n',
-                            'r' => '\r',
-                            't' => '\t',
-                            '\\' => '\\',
-                            '"' => '"',
-                            '\'' => '\'',
-                            '\0' => '\0',
-                            'b' => '\x08',
-                            'f' => '\x0c',
-                            // TODO: add support for octal and hexadecimal escape sequences
-                            _ => c,
-                        });
+                        number_str.push(c);
                     } else {
-                        return Err(CharError::Eof);
+                        break;
                     }
-                } else if c == '\n' {
-                    return Err(CharError::Newline);
-                } else if c == terminator {
-                    return Err(CharError::Terminator);
-                } else {
-                    return Ok(c);
                 }
-            } else {
-                return Err(CharError::Eof);
             }
+        }
+
+        // 解析类型后缀（如 u32, i64, f64 等）
+        let suffix = self.parse_identifier();
+        if !suffix.is_empty() {
+            number_str.push('_'); // 使用下划线分隔数字和后缀
+            number_str.push_str(&suffix);
+        }
+
+        // 根据进制和是否为浮点数返回相应类型的Token
+        if is_float && radix == 10 {
+            Ok(Token::FloatLiteral(number_str))
+        } else {
+            Ok(Token::IntegerLiteral(number_str))
         }
     }
 
-    fn parse_char(&mut self) -> Result<Token, String> {
-        let c = match self.parse_single_char(false) {
-            Ok(c) => c,
-            Err(CharError::Terminator) => {
-                return Err(String::from("Empty character constant"));
+    fn parse_string(&mut self) -> Result<Token, LexicalError> {
+        let mut string_content = String::new();
+        while let Some(c) = self.next_char() {
+            match c {
+                '"' => return Ok(Token::StringLiteral(string_content)),
+                '\\' => {
+                    if let Some(escaped) = self.next_char() {
+                        match escaped {
+                            'n' => string_content.push('\n'),
+                            'r' => string_content.push('\r'),
+                            't' => string_content.push('\t'),
+                            '0' => string_content.push('\0'),
+                            '\'' => string_content.push('\''),
+                            '"' => string_content.push('"'),
+                            '\\' => string_content.push('\\'),
+                            _ => return Err(LexicalError::UnknownEscapeSequence(escaped)),
+                        }
+                    } else {
+                        return Err(LexicalError::UnexpectedEofInLiteral);
+                    }
+                }
+                _ => string_content.push(c),
             }
-            Err(CharError::Newline) => {
-                return Err(String::from("Illegal newline while parsing char literal"));
+        }
+        Err(LexicalError::UnterminatedString)
+    }
+
+    fn parse_char(&mut self) -> Result<Token, LexicalError> {
+        let c = match self.next_char() {
+            Some(c) => c,
+            None => return Err(LexicalError::UnexpectedEofInLiteral),
+        };
+
+        let result = match c {
+            '\\' => match self.next_char() {
+                Some('n') => '\n',
+                Some('r') => '\r',
+                Some('t') => '\t',
+                Some('0') => '\0',
+                Some('\'') => '\'',
+                Some('"') => '"',
+                Some('\\') => '\\',
+                Some(c) => {
+                    return Err(LexicalError::UnknownEscapeSequence(c));
+                }
+                None => return Err(LexicalError::UnexpectedEofInLiteral),
+            },
+            '\'' => {
+                return Err(LexicalError::EmptyCharLiteral);
             }
-            Err(CharError::Eof) => {
-                return Err(String::from(
-                    "Missing terminating ' character in char literal",
-                ));
-            }
+            c => c,
         };
 
         match self.next_char() {
-            Some('\'') => Ok(Token::Char(c)),
-            Some('\n') => Err(String::from("Illegal newline while parsing char literal")),
-            Some(_) => {
-                while self.next_char().is_some_and(|next_c| next_c != '\'') {}
-                Err(String::from(
-                    "Multi-character character literal not terminated",
-                ))
-            }
-            None => Err(String::from(
-                "Missing terminating ' character in char literal",
-            )),
+            Some('\'') => Ok(Token::CharLiteral(result)),
+            Some(_) => Err(LexicalError::MultipleCharactersInCharLiteral),
+            None => Err(LexicalError::UnterminatedChar),
         }
     }
-    fn parse_string(&mut self) -> Result<Token, String> {
-        let mut string = String::new();
-        static TERM_ERR: &str = "Missing terminating \" character in string";
-        static NEWLINE_ERR: &str = "Illegal newline while parsing string literal";
 
-        loop {
-            match self.parse_single_char(true) {
-                Ok(c) => string.push(c),
-                Err(CharError::Eof) => {
-                    return Err(String::from(TERM_ERR));
-                }
-                Err(CharError::Newline) => {
-                    return Err(String::from(NEWLINE_ERR));
-                }
-                Err(CharError::Terminator) => break,
-            }
-        }
-
-        Ok(Token::String(string))
-    }
-    fn parse_id(&mut self, start: char) -> Result<Token, String> {
-        let mut id = String::from(start);
-        while let Some(c) = self.next_char() {
-            if c.is_alphanumeric() || c == '_' {
+    fn parse_identifier(&mut self) -> String {
+        let mut id = String::new();
+        while let Some(c) = self.peek() {
+            if c.is_ascii_alphanumeric() || c == '_' {
+                self.next_char();
                 id.push(c);
             } else {
-                self.unput(Some(c));
                 break;
             }
         }
-        match KEYWORDS.get::<str>(&id) {
-            Some(keyword) => Ok(Token::Keyword(*keyword)),
-            None => Ok(Token::Id(id)),
-        }
+        id
     }
 }
 
 impl<'a, R: Read> Iterator for Lexer<'a, R> {
-    // option: whether the stream is exhausted
-    // result: whether the next lexeme is an error
-    type Item = Locatable<'a, Result<Token, String>>;
+    type Item = Locatable<'a, Result<Token, LexicalError>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.skip_whitespace();
@@ -682,43 +352,241 @@ impl<'a, R: Read> Iterator for Lexer<'a, R> {
         let location = self.location.clone();
 
         let data = match c {
-            '+' => self.parse_plus(),
-            '-' => self.parse_minus(),
-            '=' => self.parse_equal(),
-            '*' => self.parse_star(),
-            '/' => self.parse_divide(),
-            '%' => self.parse_percent(),
-            '&' => self.parse_bitand(),
-            '|' => self.parse_bitor(),
-            '^' => self.parse_bitxor(),
-            '!' => self.parse_not(),
-            '>' => self.parse_greater(),
-            '<' => self.parse_less(),
-            '.' => {
-                // Check if this is a float starting with a decimal point
-                match self.peek() {
-                    Some(c) if c.is_ascii_digit() => {
-                        self.unput(Some('.'));
-                        self.parse_number()
-                    }
-                    _ => self.parse_dot(),
-                }
-            }
-            ':' => self.parse_colon(),
             '0'..='9' => {
                 self.unput(Some(c));
                 self.parse_number()
             }
-            'a'..='z' | 'A'..='Z' | '_' => self.parse_id(c),
-            '\'' => self.parse_char(),
             '"' => self.parse_string(),
+            '\'' => self.parse_char(),
+
+            'a'..='z' | 'A'..='Z' | '_' => {
+                self.unput(Some(c));
+                let identifier_str = self.parse_identifier();
+                if let Some(keyword) = KEYWORDS.get(&identifier_str) {
+                    match keyword {
+                        Keyword::Fn => Ok(Token::Fn),
+                        Keyword::Let => Ok(Token::Let),
+                        Keyword::Var => Ok(Token::Var),
+                        Keyword::With => Ok(Token::With),
+                        Keyword::Contract => Ok(Token::Contract),
+                        Keyword::Impl => Ok(Token::Impl),
+                        Keyword::Mut => Ok(Token::Mut),
+                        Keyword::If => Ok(Token::If),
+                        Keyword::Else => Ok(Token::Else),
+                        Keyword::For => Ok(Token::For),
+                        Keyword::In => Ok(Token::In),
+                        Keyword::Loop => Ok(Token::Loop),
+                        Keyword::While => Ok(Token::While),
+                        Keyword::Match => Ok(Token::Match),
+                        Keyword::Break => Ok(Token::Break),
+                        Keyword::Continue => Ok(Token::Continue),
+                        Keyword::Return => Ok(Token::Return),
+                        Keyword::As => Ok(Token::As),
+                        Keyword::Use => Ok(Token::Use),
+                        Keyword::Pub => Ok(Token::Pub),
+                        Keyword::Enum => Ok(Token::Enum),
+                        Keyword::Struct => Ok(Token::Struct),
+                        Keyword::Trait => Ok(Token::Trait),
+                        Keyword::True => Ok(Token::True),
+                        Keyword::False => Ok(Token::False),
+                        Keyword::Async => Ok(Token::Async),
+                        Keyword::Await => Ok(Token::Await),
+                        Keyword::Try => Ok(Token::Try),
+                    }
+                } else {
+                    Ok(Token::Identifier(identifier_str))
+                }
+            }
+
+            '+' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::PlusEqual)
+                } else {
+                    Ok(Token::Plus)
+                }
+            }
+            '-' => match self.peek() {
+                Some('=') => {
+                    self.next_char();
+                    Ok(Token::MinusEqual)
+                }
+                Some('>') => {
+                    self.next_char();
+                    Ok(Token::Arrow)
+                }
+                _ => Ok(Token::Minus),
+            },
+            '=' => match self.peek() {
+                Some('=') => {
+                    self.next_char();
+                    Ok(Token::EqualEqual)
+                }
+                Some('>') => {
+                    self.next_char();
+                    Ok(Token::FatArrow)
+                }
+                _ => Ok(Token::Equal),
+            },
+            '*' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::StarEqual)
+                } else {
+                    Ok(Token::Star)
+                }
+            }
+            '/' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::SlashEqual)
+                } else {
+                    Ok(Token::Slash)
+                }
+            }
+            '%' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::PercentEqual)
+                } else {
+                    Ok(Token::Percent)
+                }
+            }
+            '&' => {
+                // 检查是否是 &mut
+                let peek_location = self.location.clone();
+                if self.peek() == Some('m') {
+                    self.next_char(); // 消费 'm'
+                    if self.peek() == Some('u') {
+                        self.next_char(); // 消费 'u'
+                        if self.peek() == Some('t') {
+                            self.next_char(); // 消费 't'
+                            Ok(Token::MutRef)
+                        } else {
+                            // 不是 &mut，回退并检查是否是 &&
+                            self.unput(Some('t')); // 回退 't'
+                            self.unput(Some('u')); // 回退 'u'
+                            self.unput(Some('m')); // 回退 'm'
+                            self.location = peek_location;
+                            if self.peek() == Some('&') {
+                                self.next_char(); // 消费第二个 '&'
+                                Ok(Token::And)
+                            } else {
+                                Ok(Token::Ampersand)
+                            }
+                        }
+                    } else {
+                        // 不是 &mut，回退并检查是否是 &&
+                        self.unput(Some('u')); // 回退 'u'
+                        self.unput(Some('m')); // 回退 'm'
+                        self.location = peek_location;
+                        if self.peek() == Some('&') {
+                            self.next_char(); // 消费第二个 '&'
+                            Ok(Token::And)
+                        } else {
+                            Ok(Token::Ampersand)
+                        }
+                    }
+                } else if self.peek() == Some('&') {
+                    // 是 &&
+                    self.next_char(); // 消费第二个 '&'
+                    Ok(Token::And)
+                } else {
+                    // 单独的 &
+                    Ok(Token::Ampersand)
+                }
+            }
+            '|' => {
+                if self.peek() == Some('|') {
+                    self.next_char();
+                    Ok(Token::Or)
+                } else {
+                    Ok(Token::Pipe)
+                }
+            }
+            '^' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::CaretEqual)
+                } else {
+                    Ok(Token::Caret)
+                }
+            }
+            '!' => {
+                if self.peek() == Some('=') {
+                    self.next_char();
+                    Ok(Token::BangEqual)
+                } else {
+                    Ok(Token::Bang)
+                }
+            }
+            '<' => match self.peek() {
+                Some('=') => {
+                    self.next_char();
+                    Ok(Token::LessEqual)
+                }
+                Some('<') => {
+                    self.next_char();
+                    if self.peek() == Some('=') {
+                        self.next_char();
+                        Ok(Token::ShlEqual)
+                    } else {
+                        Ok(Token::Shl)
+                    }
+                }
+                _ => Ok(Token::Less),
+            },
+            '>' => match self.peek() {
+                Some('=') => {
+                    self.next_char();
+                    Ok(Token::GreaterEqual)
+                }
+                Some('>') => {
+                    self.next_char();
+                    if self.peek() == Some('=') {
+                        self.next_char();
+                        Ok(Token::ShrEqual)
+                    } else {
+                        Ok(Token::Shr)
+                    }
+                }
+                _ => Ok(Token::Greater),
+            },
+            '.' => {
+                match self.peek() {
+                    Some('.') => {
+                        self.next_char(); // 消费第二个点
+                        if self.peek() == Some('=') {
+                            self.next_char(); // 消费等号
+                            Ok(Token::RangeInclusive)
+                        } else {
+                            Ok(Token::Range)
+                        }
+                    }
+                    _ => Ok(Token::Dot),
+                }
+            }
             ',' => Ok(Token::Comma),
-            ';' => Ok(Token::Semi),
+            ';' => Ok(Token::Semicolon),
+            ':' => {
+                if self.peek() == Some(':') {
+                    self.next_char();
+                    Ok(Token::PathSep)
+                } else {
+                    Ok(Token::Colon)
+                }
+            }
+            '(' => Ok(Token::LParen),
+            ')' => Ok(Token::RParen),
+            '{' => Ok(Token::LBrace),
+            '}' => Ok(Token::RBrace),
+            '[' => Ok(Token::LBracket),
+            ']' => Ok(Token::RBracket),
+            '?' => Ok(Token::Question),
             '@' => Ok(Token::At),
             '#' => Ok(Token::Hash),
             '$' => Ok(Token::Dollar),
-            '?' => Ok(Token::Question),
-            _ => Err(String::from("unknown character")),
+            _ => Err(LexicalError::UnknownCharacter(c)),
         };
 
         Some(Self::Item { location, data })
