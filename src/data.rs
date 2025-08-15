@@ -1,6 +1,6 @@
 use std::fmt;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token {
     // 核心关键字，直接体现语言哲学
     Fn,       // fn
@@ -10,6 +10,8 @@ pub enum Token {
     Contract, // contract
     Impl,     // impl
     Mut,      // mut (作为一个独立的关键字)
+    Effect,   // effect (代数效应关键字)
+    Handle,   // handle (处理器关键字)
 
     // 控制流与其他通用关键字
     If,
@@ -110,7 +112,7 @@ pub enum Token {
 }
 
 /// 词法分析错误类型，提供更精确的错误信息
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LexicalError {
     /// 未知字符
     UnknownCharacter(char),
@@ -160,7 +162,7 @@ pub struct Location<'a> {
     pub file: &'a str,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Locatable<'a, T> {
     pub location: Location<'a>,
     pub data: T,
@@ -189,6 +191,8 @@ pub enum Keyword {
     Contract,
     Impl,
     Mut,
+    Effect,
+    Handle,
     If,
     Else,
     For,

@@ -32,6 +32,22 @@ name = "string_parsing_tests"
 path = "test/lexer/string_parsing.rs"
 
 [[test]]
+name = "parser_basic_tests"
+path = "test/parser/basic_parsing.rs"
+
+[[test]]
+name = "parser_declaration_tests"
+path = "test/parser/declaration_parsing.rs"
+
+[[test]]
+name = "parser_algebraic_effects_tests"
+path = "test/parser/algebraic_effects_parsing.rs"
+
+[[test]]
+name = "parser_effect_groups_tests"
+path = "test/parser/effect_groups_parsing.rs"
+
+[[test]]
 name = "integration_tests"
 path = "test/integration/complete_program.rs"
 
