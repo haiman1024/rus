@@ -468,17 +468,12 @@ impl<'a> Parser<'a> {
             Token::Fn,
             Token::Effect,
             Token::Handle,
+            Token::EffectGroup,
+            Token::HandlerGroup,
         ]) {
             // 回退一个token以便在具体解析函数中处理
             self.current -= 1;
             self.parse_declaration_statement()
-        } else if let Token::Identifier(ref ident) = self.peek().data {
-            // 检查是否是effect_group或handler_group关键字
-            if ident == "effect_group" || ident == "handler_group" {
-                self.parse_declaration_statement()
-            } else {
-                self.parse_statement()
-            }
         } else {
             self.parse_statement()
         }
@@ -493,12 +488,8 @@ impl<'a> Parser<'a> {
             Token::Fn => self.parse_function_declaration(),
             Token::Effect => self.parse_effect_declaration(),
             Token::Handle => self.parse_handler_declaration(),
-            Token::Identifier(ref ident) if ident == "effect_group" => {
-                self.parse_effect_group_declaration()
-            }
-            Token::Identifier(ref ident) if ident == "handler_group" => {
-                self.parse_handler_group_declaration()
-            }
+            Token::EffectGroup => self.parse_effect_group_declaration(),
+            Token::HandlerGroup => self.parse_handler_group_declaration(),
             _ => Err(ParseError::UnexpectedToken(format!(
                 "{:?}",
                 self.peek().data
@@ -852,8 +843,8 @@ impl<'a> Parser<'a> {
 
     /// 解析效果组声明
     fn parse_effect_group_declaration(&mut self) -> Result<Stmt, ParseError> {
-        // 消费effect_group标识符
-        let token = self.advance().clone();
+        // 消费effect_group关键字
+        let token = self.consume(&Token::EffectGroup, "Expected 'effect_group' keyword")?;
         let location_line = token.location.line;
         let location_column = token.location.column;
         let location_file = token.location.file.to_string();
@@ -901,8 +892,8 @@ impl<'a> Parser<'a> {
 
     /// 解析处理器组声明
     fn parse_handler_group_declaration(&mut self) -> Result<Stmt, ParseError> {
-        // 消费handler_group标识符
-        let token = self.advance().clone();
+        // 消费handler_group关键字
+        let token = self.consume(&Token::HandlerGroup, "Expected 'handler_group' keyword")?;
         let location_line = token.location.line;
         let location_column = token.location.column;
         let location_file = token.location.file.to_string();
@@ -969,16 +960,11 @@ impl<'a> Parser<'a> {
                 Token::Fn,
                 Token::Effect,
                 Token::Handle,
+                Token::EffectGroup,
+                Token::HandlerGroup,
             ]) {
                 self.current -= 1; // 回退token
                 statements.push(self.parse_declaration_statement()?);
-            } else if let Token::Identifier(ref ident) = self.peek().data {
-                // 检查是否是effect_group或handler_group关键字
-                if ident == "effect_group" || ident == "handler_group" {
-                    statements.push(self.parse_declaration_statement()?);
-                } else {
-                    statements.push(self.parse_statement()?);
-                }
             } else {
                 statements.push(self.parse_statement()?);
             }

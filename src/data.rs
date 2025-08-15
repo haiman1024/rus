@@ -12,6 +12,8 @@ pub enum Token {
     Mut,      // mut (作为一个独立的关键字)
     Effect,   // effect (代数效应关键字)
     Handle,   // handle (处理器关键字)
+    EffectGroup,   // effect_group (效果组关键字)
+    HandlerGroup,  // handler_group (处理器组关键字)
 
     // 控制流与其他通用关键字
     If,
@@ -193,6 +195,8 @@ pub enum Keyword {
     Mut,
     Effect,
     Handle,
+    EffectGroup,   // effect_group
+    HandlerGroup,  // handler_group
     If,
     Else,
     For,
