@@ -8,7 +8,17 @@ Rus is a new systems programming language that follows the core axiom "x(data) -
 
 This project aims to provide a platform for learning and developing compilers, helping to understand compilation principles and language implementation.
 
+The language is built upon one main axis and three pillars:
+
+- **Main Axis**: **Effect System** - Explicitly declare and manage program side effects
+- **Three Pillars**:
+  - **Algebraic Effects and Handlers**: Decouple side effects from core business logic
+  - **Contract System**: Define and verify code behavior through contracts
+  - **Linear Types and Region System**: Ensure memory safety and deterministic resource management
+
 ## Features
+
+### Lexical Analysis
 
 - Complete lexical analysis for the Rus language syntax
 - Token recognition for various literals:
@@ -18,7 +28,7 @@ This project aims to provide a platform for learning and developing compilers, h
   - Character literals (with escape sequences)
 - Identifier and keyword recognition (complete Rus keyword set)
 - Operator and symbol recognition:
-  - Arithmetic operators (+, -, *, /, %, +=, -=, *=, /=, %=)
+  - Arithmetic operators (+, -, *, /, %, +=, -=,*=, /=, %=)
   - Bitwise operators (&, |, ^, <<, >>, &=, |=, ^=, <<=, >>=)
   - Comparison operators (==, !=, <, >, <=, >=)
   - Logical operators (&&, ||)
@@ -28,6 +38,43 @@ This project aims to provide a platform for learning and developing compilers, h
 - Error reporting with precise location information
 - Comprehensive test suite covering various language features
 - Strongly typed token system following language design philosophy
+
+### Parsing
+
+- Recursive descent parser implementation
+- Pratt parsing for operator precedence and associativity
+- Support for core language constructs:
+  - Effect declarations (`effect`)
+  - Handler declarations (`handle`)
+  - Effect group declarations (`effect_group`)
+  - Handler group declarations (`handler_group`)
+  - Function declarations (`fn`)
+  - Variable declarations (`let`, `var`)
+- Expression parsing:
+  - Literals (integer, float, string, character, boolean)
+  - Identifiers
+  - Function calls
+  - Binary operations (arithmetic, comparison, logical)
+  - Unary operations (negation, logical NOT)
+  - Grouping expressions
+  - Effect operations (`effect.operation(...)`)
+- Statement parsing:
+  - Expression statements
+  - Block statements
+- Panic mode error recovery for better error reporting
+
+### Language Constructs (Planned)
+
+- Struct declarations (`struct`)
+- Enum declarations (`enum`)
+- Trait declarations (`trait`)
+- Implementation blocks (`impl`)
+- With statements (`with`)
+- Resume expressions (`resume!`)
+- Conditional expressions (`if`)
+- Pattern matching expressions (`match`)
+- Loop statements (`loop`, `while`, `for`)
+- Control flow statements (`break`, `continue`, `return`)
 
 ## Building
 
@@ -45,29 +92,42 @@ To run the project:
 cargo run
 ```
 
+For release builds:
+
+```bash
+cargo build --release
+```
+
 ## Testing
 
-To run the tests:
+To run all tests:
 
 ```bash
 cargo test
 ```
 
-## Language Design Philosophy
+To run specific test suites:
 
-This compiler is built upon a core axiom and a set of rigorous concepts:
+```bash
+# Run lexer tests
+cargo test --test lexer_tests
+cargo test --test number_parsing_tests
+cargo test --test string_parsing_tests
 
-- **Core Axiom**: `x(data) --- (behavior) --> y(effect)`
-- **Three Core Concepts**:
-  - **Strong Controllability**: Developers must fully control program behavior and side effects.
-  - **Fine Granularity**: Language elements are finely divided and defined for precise control.
-  - **Flexibility**: The language's underlying architecture is solid while reserving space for upper-level syntax innovation and expansion.
+# Run parser tests
+cargo test --test parser_basic_tests
+cargo test --test parser_declaration_tests
+cargo test --test parser_algebraic_effects_tests
+cargo test --test parser_effect_groups_tests
 
-The architecture is based on one main axis and three pillars:
-- **Main Axis**: `x(data) --- (behavior) --> y(effect)`
-- **Three Pillars**:
-  - **Effect System**: Explicitly declare and manage program side effects through keywords like `with`.
-  - **Contract System**: Define and verify code behavior through the `contract` keyword.
-  - **Linear Types and Region System**: Ensure memory safety and deterministic resource management through strict control of ownership and mutability.
+# Run integration tests
+cargo test --test integration_tests
+```
 
-For more detailed information about the design process and implementation, see [dev.md](docs/dev.md).
+## Documentation
+
+For detailed information about the language design, implementation progress, and development notes, see [dev.md](docs/dev.md).
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
